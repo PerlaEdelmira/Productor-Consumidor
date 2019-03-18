@@ -1,0 +1,94 @@
+import java.security.SecureRandom;
+import java.util.concurrent.*;
+interface Buffer{
+	public void blockingPut(int valor)throws InterruptedException;
+	public int blockingGet() throws InterruptedException;
+
+}
+class BlockingBuffer implements Buffer{
+
+	private final ArrayBlockingQueue<Integer> buffer;
+	public BlockingBuffer() {
+		buffer = new ArrayBlockingQueue<Integer>(1);
+	}
+	@Override
+	public void blockingPut(int valor) throws InterruptedException {
+		buffer.put(valor);
+		System.out.printf("%s%2d\t%s%d%n", "Producer writes ", valor,
+				"Buffer cells occupied: ", buffer.size());
+		
+	}
+
+	@Override
+	public int blockingGet() throws InterruptedException {
+		int readValue = buffer.take();
+		System.out.printf("%s %2d\t%s%d%n", "Consumer reads ",
+				readValue, "Buffer cells occupied: ", buffer.size());
+		return 0;
+	}
+}//class BlockignBuffer
+class Producer implements Runnable{
+	private static final SecureRandom generador = new SecureRandom();
+	private final Buffer sharedLocation;
+	
+	public Producer(Buffer sharedLocation) {
+		this.sharedLocation = sharedLocation;
+	}
+	@Override
+	public void run() {
+		int sum = 0;
+		for(int i=1; i<=10; i++) {
+			try {
+				Thread.sleep(generador.nextInt(3000));
+				sharedLocation.blockingPut(i);
+				sum += i;
+				System.out.printf("\t%2d%n", sum);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				e.printStackTrace();
+			}
+		}
+		System.out.printf("Produce done producing %n Terminating Producer %n ");
+	}
+}//class Producer
+class Consumidor implements Runnable{
+	private static final SecureRandom generator = new SecureRandom();
+	private final Buffer sharedLocation;
+	
+	public Consumidor(Buffer sharedLocation) {
+		this.sharedLocation = sharedLocation;
+	}
+	@Override
+	public void run() {
+		int sum = 0;
+		for(int i=1; i<=10; i++) {
+			try {
+				Thread.sleep(generator.nextInt(3000));
+				sum += sharedLocation.blockingGet();
+				System.out.printf("\t\t\t%2d%n", sum);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				e.printStackTrace();
+			}
+		}
+		System.out.printf("%n%s %d%n%s%n","Consumer read values totaling", sum, "Terminating Consumer");		
+	}
+}//class Consumidor
+public class Prueba_ProductorConsumidorArray {
+	public static void main(String[] args) {
+		ExecutorService executorService = Executors.newCachedThreadPool();
+		
+		Buffer sharedLocation = new BlockingBuffer();
+		executorService.execute(new Producer(sharedLocation));
+		executorService.execute(new Consumidor(sharedLocation));
+		
+		executorService.shutdown();
+		try {
+			executorService.awaitTermination(1, TimeUnit.MINUTES);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+	}
+
+}
